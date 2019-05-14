@@ -3,7 +3,7 @@
 
 from math import *
 from random import *
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 # Define a point class 
