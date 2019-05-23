@@ -18,6 +18,21 @@ class point:
     def __str__(self):
         return ( "x = " + str(self.x) + ", y = " + str(self.y) + ", obs = " + str(self.obstacle) + " and test:"+str(self.test) );
 
+
+    def __hash__(self):
+        return self.x.__hash__() + self.y.__hash__()
+    
+    def __eq__(self, other):
+        if isinstance(other, point):
+            if self.x == other.x and self.y == other.y:
+                return True
+        else:
+            return False
+    
+    def __repr__(self):      
+        return str(self.x) + ";"  + str(self.y)
+
+
     # Are the two points the same
     def equals(self, other):
         if( self.x == other.x and self.y == other.y):
@@ -87,8 +102,9 @@ class node:
 
         # define the type
         # 1 : quad_cell
-        # 2: left_tri_cell
-        # 3: right_tri_cell
+        # 2: left_cell
+        # 3: right_cell
+        # 4: left_right_cell
         self.type = type
 
         # define the centroid point of each polygon
@@ -105,9 +121,13 @@ class node:
         # middle point has the same order as adjacent cells
         self.middle_point = []
 
+        # define the path to adjacent polygon
+        self.path_to_adjaceny = []
+
         # define the distance from the current node to the adjacent node:
         # current_cell_centroid -> middle -> point -> adjacent_cell_centroid
         self.distance = []
+
 
     def add_adjacent(self, node):
         self.adjacent.append(node)
@@ -120,6 +140,12 @@ class node:
 
     def get_middle_point(self):
         return self.middle_point
+
+    def add_path_to_adjacency(self, points):
+        self.path_to_adjaceny.append(points)
+
+    def get_path_to_adjacency(self):
+        return self.path_to_adjaceny
 
     def calculate_distance(self):
         for index, ad_node in enumerate(self.adjacent):
@@ -394,4 +420,25 @@ def refine_check_line(line):
         # else:
         #     p.y = p.y + 0.5
     return new_line
+
+
+def merge_polygon(points):
+    points = list(set(points))
+    points.sort(key = lambda point: point.x)
+    upper_points_index = []
+    upper_points = []
+    for index in range(len(points) - 1):
+        if points[index].x == points[index+1].x:
+            if points[index].y > points[index+1].y:
+                upper_points_index.append(index+1)
+                upper_points.append(points[index+1])
+            else:
+                upper_points_index.append(index)
+                upper_points.append(points[index])
+    upper_points.sort(key = lambda point: -point.x)
+    points = points + upper_points
+    upper_points_index = sorted(upper_points_index, reverse=True)
+    for index in upper_points_index:
+        points.pop(index)
+    return points
 
