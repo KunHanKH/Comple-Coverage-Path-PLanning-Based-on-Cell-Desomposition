@@ -73,22 +73,32 @@ def draw_problem(boundary, obstacles, source, dest):
 	plt.annotate('Destination', xy=(dest.x, dest.y), xytext=(dest.x-4, dest.y-10) )
 	# plt.show()
 
+def draw_cell(cells, boundary, obstacles, source, dest):
+	for i, cell in enumerate(cells):
+	#     plt.figure(i)
+		x = [pnt.x for pnt in cell]
+		y = [pnt.y for pnt in cell]
+		x.append(x[0])
+		y.append(y[0])
+		draw_problem(boundary, obstacles, source, dest)
+		plt.plot(x, y)
+
 def draw_node(nodes, boundary, obstacles, source, dest, fill=None):
 	for index, i in enumerate(nodes):
-	    draw_problem(boundary, obstacles, source, dest)
+		draw_problem(boundary, obstacles, source, dest)
 
-	    x = [j.x for j in i.polygon]
-	    x.append(x[0])
-	    y = [j.y for j in i.polygon]
-	    y.append(y[0])
-	    plt.plot(x, y)
+		x = [j.x for j in i.polygon]
+		x.append(x[0])
+		y = [j.y for j in i.polygon]
+		y.append(y[0])
+		plt.plot(x, y)
 
-	    if fill is not None:
-	    	plt.fill(x, y)
+		if fill is not None:
+			plt.fill(x, y)
 
-	    center = i.centroid
-	    plt.plot(center.x, center.y, marker="o")
-	    plt.annotate('cell-{}'.format(index), xy=(center.x, center.y))
+		center = i.centroid
+		plt.plot(center.x, center.y, marker="o")
+		plt.annotate('cell-{}'.format(index), xy=(center.x, center.y))
 
 
 def get_vertical_line(sorted_vertices, obstacles,  y_limit_lower, y_limit_upper):
@@ -335,7 +345,7 @@ def remove_duplicate_cell(quad_cells):
 	to_remove = []
 	for index1 in range(len(quad_cells)):
 		for index2 in range(index1+1, len(quad_cells)):
-			duplicate = True;
+			duplicate = True
 			for k,m in zip(quad_cells[index1], quad_cells[index2]):
 				if k.equals(m) is False:
 					duplicate = False
@@ -363,40 +373,100 @@ def remove_new_added_merged_cell(quad_cells):
 		del quad_cells[index]
 
 
+def generate_node_set(cells, width, step=None):
+	nodes = []
+	
+	initialize_node_set(nodes, cells)
+		
+	for curr_node in nodes:
+		for next_node in nodes:
+			if(next_node.index != curr_node.index):
+				# define the type
+				# 1: quad_cell
+				# 2: left_tri_cell: left side has only one point
+				# 3: right_tri_cell: right side has only one point
+				
+				# get adjacent nodes
+				if((curr_node.type == 1 or curr_node.type == 2) and 
+					(next_node.type == 1 or next_node.type == 3)):
+					if(curr_node.polygon[1].x == next_node.polygon[0].x):
+						if( (max(curr_node.polygon[2].y, next_node.polygon[-1].y) - min(curr_node.polygon[1].y, next_node.polygon[0].y)) 
+							 < (abs(curr_node.polygon[2].y - curr_node.polygon[1].y) + abs(next_node.polygon[-1].y - next_node.polygon[0].y)) ):
+							curr_node.add_adjacent(next_node)
+		total_adjacent = curr_node.get_adjacent()
+		
+		# add middle point and path to adjacent node
+		if(len(total_adjacent) == 1):
+			curr_node.add_middle_point(centroid([curr_node.polygon[1], curr_node.polygon[2]]))
+			curr_node.add_path_to_adjacency([curr_node.centroid, curr_node.middle_point[0], curr_node.adjacent[0].centroid])
+			
+		elif(len(total_adjacent) >= 1):
+			for i, ad_node in enumerate(total_adjacent):
+				curr_node.add_middle_point(centroid([ad_node.polygon[0], ad_node.polygon[-1]]))
+				curr_node.add_path_to_adjacency([curr_node.centroid, curr_node.middle_point[i], curr_node.adjacent[i].centroid])
+		
+		# calculate the distance to the adjacent node
+		curr_node.calculate_distance()
+		
+		if step is not None:
+		# need step
+			curr_node.inside_path = sweep(curr_node.polygon, width, step)
+		# no step
+		else:
+			curr_node.inside_path = sweep(curr_node.polygon, width)
+	return nodes
+
+def initialize_node_set(nodes, cells):
+	# define the type
+	# 1: quad_cell
+	# 2: left_tri_cell: left side has only one point
+	# 3: right_tri_cell: right side has only one point
+	for index, cell in enumerate(cells):
+		if(len(cell)) == 4:
+			nodes.append(node(index, cell, 1))
+		elif(len(cell) == 3 and cell[1].x == cell[2].x):
+			nodes.append(node(index, cell, 2))
+		elif(len(cell) == 3 and cell[0].x == cell[2].x):
+			nodes.append(node(index, cell, 3))
+	#     print("{}-th polygon:\n\ttype: {}\n\tcentroid: {}".format(index, nodes[index].type, nodes[index].centroid))
+
+
 def get_middle_pnt(nodes, n1, n2):
-    for index, ad_node in enumerate(nodes[n1].adjacent):
-        if ad_node.index == n2:
-            return nodes[n1].middle_point[index]
-    for index, ad_node in enumerate(nodes[n2].adjacent):
-        if ad_node.index == n1:
-            return nodes[n2].middle_point[index]
-    print("No middle pnt")
-    return None
+	for index, ad_node in enumerate(nodes[n1].adjacent):
+		if ad_node.index == n2:
+			return nodes[n1].middle_point[index]
+	for index, ad_node in enumerate(nodes[n2].adjacent):
+		if ad_node.index == n1:
+			return nodes[n2].middle_point[index]
+	print("No middle pnt")
+	return None
 
-def generate_two_node_path(n1, n2, st_path_matrix, nodes):
-    temp_path = st_path_matrix[n1][n2]
-    medium_path = []
-    for i in range(len(temp_path)-1):
-        start_pnt = nodes[temp_path[i]].centroid
-        end_pnt = nodes[temp_path[i+1]].centroid
-        
-        medium_path.append(start_pnt)
-        
-        middle_pnt = get_middle_pnt(nodes, temp_path[i], temp_path[i+1])
-        
-        step_path = stepsBetwn(start_pnt, middle_pnt, 30)
-        medium_path = medium_path + step_path
-        
-        medium_path.append(middle_pnt)
-        
-        step_path = stepsBetwn(middle_pnt, end_pnt, 30)
-        medium_path = medium_path + step_path
-    
-    medium_path.append(nodes[temp_path[-1]].centroid)
-    return medium_path
+def generate_two_node_path(n1, n2, st_path_matrix, nodes, step = None):
+	temp_path = st_path_matrix[n1][n2]
+	medium_path = []
+	for i in range(len(temp_path)-1):
+		start_pnt = nodes[temp_path[i]].centroid
+		end_pnt = nodes[temp_path[i+1]].centroid
+		
+		medium_path.append(start_pnt)
+		
+		middle_pnt = get_middle_pnt(nodes, temp_path[i], temp_path[i+1])
+		
+		if step is not None:
+			step_path = stepsBetwn(start_pnt, middle_pnt, step)
+			medium_path = medium_path + step_path
+		
+		medium_path.append(middle_pnt)
 
-def generate_path(st_path, st_path_matrix, nodes):
-    path = []
-    for i in range(len(st_path)-1):
-        path.append(generate_two_node_path(st_path[i], st_path[i+1], st_path_matrix, nodes))
-    return path
+		if step is not None:
+			step_path = stepsBetwn(middle_pnt, end_pnt, step)
+			medium_path = medium_path + step_path
+	
+	medium_path.append(nodes[temp_path[-1]].centroid)
+	return medium_path
+
+def generate_path(st_path, st_path_matrix, nodes, step):
+	path = []
+	for i in range(len(st_path)-1):
+		path.append(generate_two_node_path(st_path[i], st_path[i+1], st_path_matrix, nodes, step))
+	return path

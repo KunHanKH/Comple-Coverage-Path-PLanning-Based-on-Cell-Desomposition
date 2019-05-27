@@ -1,7 +1,7 @@
 from helpers.geometry import *
 import math
 # return list of points
-def sweep(vertexes, width, step):
+def sweep(vertexes, width, step = None):
     # width of tuolaji
     WIDTH = width
     STEP = step
@@ -47,15 +47,10 @@ def sweep(vertexes, width, step):
 
     reorderIntersections(edges, intersections)
 
-    # for i in intersections:
-    #     print(i)
+    if step is None:
+        return intersections
 
     res = addStepsToPath(intersections, STEP)
-
-    # print("-------------------")
-
-    # for i in res:
-    #     print(i)
 
     return res
 
