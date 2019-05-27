@@ -2,10 +2,12 @@ from geometry import *
 import math
 
 # return list of points
-def sweep(vertexes):
+def sweep(vertexes, width, step, safeWidth):
     # width of tuolaji
-    WIDTH = 2
-    STEP = 2
+    WIDTH = width
+    STEP = step
+
+    vertexes = shrinkArea(vertexes, safeWidth)
 
     edges = []
     maxLength = -1
@@ -59,6 +61,31 @@ def sweep(vertexes):
         print(i)
 
     return res
+
+
+def shrinkArea(vertexes, safeWidth):
+    newEdges = []
+    for i in range(len(vertexes)):
+        vertex0 = vertexes[i]
+        vertex1 = vertexes[(i + 1) % len(vertexes)]
+
+        edge = Line.getLineFromTwoPoints(vertex0, vertex1)
+        direct = edge.relativePosition(vertexes[(i + 2) % len(vertexes)])
+
+        # after shifting, the edge automatically becomes infinite
+        newEdges.append(edge.shift(direct * safeWidth))
+
+    newVertexes = []
+    for i in range(len(newEdges)):
+        line0 = newEdges[i]
+        line1 = newEdges[(i + 1) % len(newEdges)]
+
+        newVertexes.append(line0.getIntersection(line1))
+
+    last = newVertexes.pop(len(newVertexes) - 1)
+    newVertexes.insert(0, last)
+
+    return newVertexes
 
 
 def reorderIntersections(edges, intersections):
@@ -181,7 +208,7 @@ class Line:
             b = (x1 * y2 - x2 * y1) / (x1 - x2)
             return Line(False, -1, k, b, min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
 
-    # a infinite line call this function to intersect with finite line
+    # must be called by a infinite line
     def getIntersection(self, line2):
         k1 = self.k
         b1 = self.b
@@ -204,6 +231,8 @@ class Line:
             x = round((b2 - b1) / (k1 - k2), 2)
             y = round((b2 * k1 - b1 * k2) / (k1 - k2), 2)
 
+        if line2.minX == -1 and line2.maxX == -1 and line2.minY == -1 and line2.maxY == -1:
+            return point(x, y)
         if (x >= line2.minX) and (x <= line2.maxX) and (y >= line2.minY) and (y <= line2.maxY):
             return point(x, y)
         else:
@@ -279,7 +308,7 @@ def main():
     list.append(point2)
     list.append(point3)
 
-    sweep(list)
+    sweep(list, 2, 2, 0.5)
 
 
 
