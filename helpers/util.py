@@ -465,7 +465,7 @@ def generate_two_node_path(n1, n2, st_path_matrix, nodes, step = None):
 	medium_path.append(nodes[temp_path[-1]].centroid)
 	return medium_path
 
-def generate_path(st_path, st_path_matrix, nodes, step):
+def generate_path(st_path, st_path_matrix, nodes, step=None):
 	path = []
 	for i in range(len(st_path)-1):
 		path.append(generate_two_node_path(st_path[i], st_path[i+1], st_path_matrix, nodes, step))
