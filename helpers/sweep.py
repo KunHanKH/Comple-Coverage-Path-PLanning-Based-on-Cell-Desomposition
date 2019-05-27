@@ -1,7 +1,7 @@
-from geometry import *
+from helpers.geometry import *
 import math
-
 # return list of points
+
 def sweep(vertexes, width, step, safeWidth):
     # width of tuolaji
     WIDTH = width
@@ -50,15 +50,13 @@ def sweep(vertexes, width, step, safeWidth):
 
     reorderIntersections(edges, intersections)
 
-    for i in intersections:
-        print(i)
+    if step is None:
+        return intersections
 
     res = addStepsToPath(intersections, STEP)
 
-    print("-------------------")
-
-    for i in res:
-        print(i)
+    # for i in res:
+    #     print(i)
 
     return res
 
@@ -294,8 +292,6 @@ class Line:
 
 
 
-
-
 def main():
     point0 = point(3, 2)
     point1 = point(9, 8)
@@ -314,8 +310,4 @@ def main():
 
 
 main()
-
-
-
-
 

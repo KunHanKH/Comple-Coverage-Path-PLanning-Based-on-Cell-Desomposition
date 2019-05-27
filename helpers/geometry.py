@@ -129,6 +129,10 @@ class node:
         self.distance = []
 
 
+        # define the inside simple path
+        self.inside_path = None
+
+
     def add_adjacent(self, node):
         self.adjacent.append(node)
 
