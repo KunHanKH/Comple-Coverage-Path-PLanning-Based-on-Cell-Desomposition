@@ -21,10 +21,8 @@ def generate_polygon_countour(image_name, filter=None, sp=None, sr=None):
 	return [img, approxes]
 
 # Use point object to represent the boundary and the src/dest
-def extract_vertex(boundary, source, dest, obstacles):
+def extract_vertex(boundary, obstacles):
 	boundary = [point(i[0], i[1]) for i in boundary]
-	source = point(source[0], source[1])
-	dest = point(dest[0], dest[1])
 
 	# generate new sorted vertices based on the x value
 	new_sorted_vertices = []
@@ -42,12 +40,12 @@ def extract_vertex(boundary, source, dest, obstacles):
 			temp_obs.append(temp)
 		new_obstacles.append(temp_obs)
 
-	return boundary, source, dest, new_sorted_vertices, new_obstacles
+	return boundary, new_sorted_vertices, new_obstacles
 
 
 
 # Draw the obstacles and point the source and the destination----------------------------------------------
-def draw_problem(boundary, obstacles, source, dest):
+def draw_problem(boundary, obstacles):
 	bnd_x = [i.x for i in boundary]
 	# add the x-value of the start point
 	bnd_x.append(boundary[0].x)
@@ -67,25 +65,21 @@ def draw_problem(boundary, obstacles, source, dest):
 
 		plt.fill( poly_x[index], poly_y[index], color="#512DA8")
 
-	plt.plot(source.x, source.y, marker="o")
-	plt.plot(dest.x, dest.y, marker="o")
-	plt.annotate('Source', xy=(source.x, source.y), xytext=(source.x+5, source.y-6) )
-	plt.annotate('Destination', xy=(dest.x, dest.y), xytext=(dest.x-4, dest.y-10) )
 	# plt.show()
 
-def draw_cell(cells, boundary, obstacles, source, dest):
+def draw_cell(cells, boundary, obstacles):
 	for i, cell in enumerate(cells):
 	#     plt.figure(i)
 		x = [pnt.x for pnt in cell]
 		y = [pnt.y for pnt in cell]
 		x.append(x[0])
 		y.append(y[0])
-		draw_problem(boundary, obstacles, source, dest)
+		draw_problem(boundary, obstacles)
 		plt.plot(x, y)
 
-def draw_node(nodes, boundary, obstacles, source, dest, fill=None):
+def draw_node(nodes, boundary, obstacles, fill=None):
 	for index, i in enumerate(nodes):
-		draw_problem(boundary, obstacles, source, dest)
+		draw_problem(boundary, obstacles)
 
 		x = [j.x for j in i.polygon]
 		x.append(x[0])
