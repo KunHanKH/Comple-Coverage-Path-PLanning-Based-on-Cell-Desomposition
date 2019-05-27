@@ -2,12 +2,13 @@ from helpers.geometry import *
 import math
 # return list of points
 
-def sweep(vertexes, width, step, safeWidth):
+def sweep(vertexes, width, step=None, safeWidth=None):
     # width of tuolaji
     WIDTH = width
     STEP = step
 
-    vertexes = shrinkArea(vertexes, safeWidth)
+    if safeWidth is not None:
+        vertexes = shrinkArea(vertexes, safeWidth)
 
     edges = []
     maxLength = -1
@@ -292,22 +293,22 @@ class Line:
 
 
 
-def main():
-    point0 = point(3, 2)
-    point1 = point(9, 8)
-    point2 = point(2, 9)
-    point3 = point(1, 8)
+# def main():
+#     point0 = point(3, 2)
+#     point1 = point(9, 8)
+#     point2 = point(2, 9)
+#     point3 = point(1, 8)
 
-    list = []
-    list.append(point0)
-    list.append(point1)
-    list.append(point2)
-    list.append(point3)
+#     list = []
+#     list.append(point0)
+#     list.append(point1)
+#     list.append(point2)
+#     list.append(point3)
 
-    sweep(list, 2, 2, 0.5)
-
-
+#     sweep(list, 2, 2, 0.5)
 
 
-main()
+
+
+# main()
 

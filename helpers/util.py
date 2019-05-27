@@ -373,7 +373,7 @@ def remove_new_added_merged_cell(quad_cells):
 		del quad_cells[index]
 
 
-def generate_node_set(cells, width, step=None):
+def generate_node_set(cells, width, step=None, safeWidth=None):
 	nodes = []
 	
 	initialize_node_set(nodes, cells)
@@ -408,12 +408,7 @@ def generate_node_set(cells, width, step=None):
 		# calculate the distance to the adjacent node
 		curr_node.calculate_distance()
 		
-		if step is not None:
-		# need step
-			curr_node.inside_path = sweep(curr_node.polygon, width, step)
-		# no step
-		else:
-			curr_node.inside_path = sweep(curr_node.polygon, width)
+		curr_node.inside_path = sweep(curr_node.polygon, width, step, safeWidth)
 	return nodes
 
 def initialize_node_set(nodes, cells):
