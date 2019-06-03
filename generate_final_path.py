@@ -44,7 +44,7 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
     quad_cells, left_tri_cells, right_tri_cells = generate_naive_polygon(open_line_segments, sorted_vertices, obstacles)
     
     # Merge overlapping Polygons
-    merge_overlapping_quad_cell(quad_cells)
+    refine_quad_cells(quad_cells)
     
     # Add boundary cell
     if( boundary[0].x != sorted_vertices[0].x):

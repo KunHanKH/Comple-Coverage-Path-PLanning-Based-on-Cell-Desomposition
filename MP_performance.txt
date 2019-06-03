@@ -1,0 +1,14 @@
+First step: 
+
+extract_vertex_mp
+time: 1.8201844692230225
+get_vertical_line_mp
+time: 2.8649649620056152
+generate_naive_polygon_mp
+time: 3.1596450805664062
+refine_quad_cells_mp
+time: 14.845367670059204
+generate_node_set_mp
+time: 8.617656230926514
+generate_path_mp
+time: 12.870764970779419

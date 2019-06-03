@@ -366,7 +366,7 @@ def check_line_obstacle_intersection(line, obstacles):
 
 def check_quad_polygon(current_vertex, current_segment_point, next_vertex, next_segment_point, obstacles):
     check_line = [centroid([current_segment_point, current_vertex]), centroid([next_segment_point, next_vertex])]
-    check_line = refine_check_line(check_line);
+    check_line = refine_check_line(check_line)
     # x = [p.x for p in check_line]
     # y = [p.y for p in check_line]
 
