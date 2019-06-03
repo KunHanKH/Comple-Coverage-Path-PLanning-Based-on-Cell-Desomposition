@@ -63,7 +63,6 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
     # [0, [245;0, 245;647]]
     # [1, [278;0, 278;346]]
     # ...
-
     open_line_segments_manager_list = manager.list(open_line_segments)
     print("time:", time.time() - t)
 
@@ -90,14 +89,18 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
 
     # Add boundary cell
     if (boundary[0].x != sorted_vertices[0].x):
+        # quad_cells.append(
         quad_cells_manager_list.append(
             [boundary[0], point(sorted_vertices[0].x, y_limit_lower), point(sorted_vertices[0].x, y_limit_upper),
              boundary[3]])
     if (boundary[1].x != sorted_vertices[len(sorted_vertices) - 1].x):
-        quad_cells_manager_list.append([point(sorted_vertices[len(sorted_vertices) - 1].x, y_limit_lower), boundary[1], boundary[2],
-                           point(sorted_vertices[len(sorted_vertices) - 1].x, y_limit_upper)])
+        # quad_cells.append(
+        quad_cells_manager_list.append(
+            [point(sorted_vertices[len(sorted_vertices) - 1].x, y_limit_lower), boundary[1], boundary[2],
+             point(sorted_vertices[len(sorted_vertices) - 1].x, y_limit_upper)])
 
     # combine all the cells
+    # all_cell = quad_cells+left_tri_cells+right_tri_cells
     all_cell = []
     for quar_cell in quad_cells_manager_list:
         all_cell.append(quar_cell)
@@ -120,9 +123,8 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
     print('generate_node_set_mp')
     # nodes = generate_node_set(all_cell, width, step, safeWidth=20)
     nodes = generate_node_set_mp(all_cell_manager_list, pool, manager, width, step, safeWidth=20)
-    print("time:", time.time() - t)
     nodes_manager_list = manager.list(nodes)
-
+    print("time:", time.time() - t)
 
 
     # get the adjacency matrix
@@ -156,6 +158,11 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
     print('generate_path_mp')
     # new_path_node = generate_path(shortest_path_node, g.st_path_matrix, nodes, step)
     new_path_node = generate_path_mp(shortest_path_node, st_path_matrix_manager_list, nodes_manager_list, pool, manager, step)
+    # new_path_node here has a little difference from the serial version
+    # first value is the index based on the shortest_path
+    # [0, [...]]
+    # [1, [...]]
+
     print("time:", time.time() - t)
 
     pool.close()

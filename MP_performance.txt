@@ -1,4 +1,23 @@
-First step: 
+#############################################
+
+Seiral_execution:
+
+extract_vertex_mp
+time: 0.0
+get_vertical_line_mp
+time: 0.007972478866577148
+generate_naive_polygon_mp
+time: 0.06489014625549316
+refine_quad_cells_mp
+time: 0.0019757747650146484
+generate_node_set_mp
+time: 0.007008790969848633
+generate_path_mp
+time: 0.001008749008178711
+
+#############################################
+
+MP_naive: 
 
 extract_vertex_mp
 time: 1.8201844692230225
@@ -12,3 +31,20 @@ generate_node_set_mp
 time: 8.617656230926514
 generate_path_mp
 time: 12.870764970779419
+
+#############################################
+
+MP_Manager_Pool:
+
+extract_vertex_mp
+time: 0.010967254638671875
+get_vertical_line_mp
+time: 0.0498809814453125
+generate_naive_polygon_mp
+time: 0.13163256645202637
+refine_quad_cells_mp
+time: 0.5465390682220459
+generate_node_set_mp
+time: 0.03690600395202637
+generate_path_mp
+time: 0.06582427024841309
