@@ -5,6 +5,7 @@ import cv2
 import multiprocessing
 import time
 import os
+from multiprocessing import Manager
 
 
 # use cv2.pyrMeanShiftFiltering if filter = True
@@ -40,27 +41,18 @@ def generate_obstacle_basic(obstacle):
 	return obstacle_vertex_list
 
 # Use point object to represent the boundary and the src/dest
-def extract_vertex_mp(boundary, obstacles):
+def extract_vertex_mp(boundary, obstacles_basic_manager_list, pool):
+
     boundary = [point(i[0], i[1]) for i in boundary]
 
-    # set the pool parameters
-    cpu_count = multiprocessing.cpu_count()
-    len_vertex = sum([len(ob) for ob in obstacles])
-    chunk_size = int((len_vertex-1)/cpu_count) + 1
-
-    # t1 = time.time()
-    pool = multiprocessing.Pool(cpu_count)
-    # generate new sorted vertices based on the x value
-    new_sorted_vertices = pool.map(generate_vertex_point_basic, obstacles, chunksize=chunk_size)
+    # # generate new sorted vertices based on the x value
+    new_sorted_vertices= pool.map(generate_vertex_point_basic, obstacles_basic_manager_list)
     new_sorted_vertices = [point for obs in new_sorted_vertices for point in obs]
     new_sorted_vertices.sort(key=lambda pnt: pnt.x)
 
     # reconstruct the obstacle using the point object using mp
-    new_obstacles = pool.map(generate_obstacle_basic, obstacles, chunksize=chunk_size)
+    new_obstacles = pool.map(generate_obstacle_basic, obstacles_basic_manager_list)
 
-    pool.close()
-    pool.join()
-    # print(time.time() - t1)
     return boundary, new_sorted_vertices, new_obstacles
 
 
@@ -115,7 +107,7 @@ def draw_node(nodes, boundary, obstacles, fill=None):
         plt.plot(center.x, center.y, marker="o")
         plt.annotate('cell-{}'.format(index), xy=(center.x, center.y))
 
-def get_vertical_line_basic(index_mp, vertex, obstacles, y_limit_lower, y_limit_upper, queue_line, lock_line):
+def get_vertical_line_basic(index_mp, vertex, obstacles, y_limit_lower, y_limit_upper):
 
     curr_line_segment = [point(vertex.x, y_limit_lower), point(vertex.x, y_limit_upper)]
     lower_obs_pt = curr_line_segment[0]
@@ -175,57 +167,48 @@ def get_vertical_line_basic(index_mp, vertex, obstacles, y_limit_lower, y_limit_
     # 	plt.plot( [pt.x, upper_obs_pt.x],  [pt.y, upper_obs_pt.y] )
 
     # Add to the global segment list
-    lock_line.acquire()
+    # lock_line.acquire()
     if (lower_gone and upper_gone):
-        queue_line.put([index_mp, [None, None]])
+        return [index_mp, [None, None]]
     elif (lower_gone):
-        queue_line.put([index_mp, [None, upper_obs_pt]])
+        return [index_mp, [None, upper_obs_pt]]
     # plt.plot( [pt.x, upper_obs_pt.x],  [pt.y, upper_obs_pt.y] )
     elif (upper_gone):
-        queue_line.put([index_mp, [lower_obs_pt, None]])
+        return [index_mp, [lower_obs_pt, None]]
     # plt.plot( [lower_obs_pt.x, pt.x],  [lower_obs_pt.y, pt.y] )
     else:
-        queue_line.put([index_mp, [lower_obs_pt, upper_obs_pt]])
-    lock_line.release()
+        return [index_mp, [lower_obs_pt, upper_obs_pt]]
+    # lock_line.release()
 
-def get_vertical_line_mp(sorted_vertices, obstacles, y_limit_lower, y_limit_upper):
+def get_vertical_line_mp(sorted_vertices, y_limit_lower, y_limit_upper,
+                         obstacles_manager_list, pool):
     # -----------------------------------------------------------
     # Find vertical lines
     # Make sure all the vertical line has the same x-value as the current vertex
     # set the pool parameter
-    len_vertex = len(sorted_vertices)
-    queue_line = multiprocessing.Queue(len_vertex)
-    lock_line = multiprocessing.Lock()
 
-    open_line_segments = [[]] * len_vertex
+    # open_line_segments = [[]] * len_vertex
+    open_line_segments = []
 
-    p_list = []
-    for index, vertex in enumerate(sorted_vertices):
-        p_list.append(multiprocessing.Process(target=get_vertical_line_basic, args=(index, vertex,
-            obstacles, y_limit_lower, y_limit_upper, queue_line, lock_line)))
+    multi_results = [pool.apply_async(func=get_vertical_line_basic,
+                                     args=(index, vertex, obstacles_manager_list, y_limit_lower, y_limit_upper))
+                     for index, vertex in enumerate(sorted_vertices)]
 
-    t1 = time.time()
-    for p in p_list:
-        p.start()
+    for res in multi_results:
+        open_line_segments.append(res.get())
 
-    for p in p_list:
-        p.join()
-
-    while queue_line.empty() is False:
-        temp_line = queue_line.get()
-        open_line_segments[temp_line[0]] = temp_line[1]
-
+    open_line_segments.sort(key = lambda line: line[0])
 
     return open_line_segments
 
 def generate_naive_polyfon_basic(index, open_line_segments, sorted_vertices, obstacles,
-                                 queue_quad_cells, queue_left_tri_cells, queue_right_tri_cells, lock_polygon):
+                                 queue_quad_cells, queue_left_tri_cells, queue_right_tri_cells):
     # Find Polygon cells naiively. Will improve next.
     # cells = []
     # Important:
     # Don't change the value of element in new_sorted_vertices and open_line_segments
 
-    curr_segment = open_line_segments[index]
+    curr_segment = open_line_segments[index][1]
     curr_vertex = sorted_vertices[index]
     # plt.plot(curr_vertex.x, curr_vertex.y, marker='o')
     break_now = False
@@ -246,43 +229,31 @@ def generate_naive_polyfon_basic(index, open_line_segments, sorted_vertices, obs
 
     # index2 the following sorted vertices
     for index2 in range(index + 1, len(open_line_segments)):
-        next_segment = open_line_segments[index2]
+        next_segment = open_line_segments[index2][1]
         next_vertex = sorted_vertices[index2]
 
-        # double_index1 = -2;
-        # double_index2 = -2;
-        # lines_to_check = [];
-
-        # double_check = False;
-
-        # # double_check is True if there are lines below and above the vertex
-        # if (next_segment[0] is not None and next_segment[1] is not None ):
-        #     double_check = True;
-
-        # if the lower pt isn't the vertice
-        # check whether there is a polygon use the [current_vertex, current_segment[0]] as boundary
         if (done[0] is False):
             if (next_segment[0] is not None):
                 # check the upper polygon
                 if (check_quad_polygon(curr_vertex, curr_segment[0], next_vertex, next_segment[0], obstacles)):
-                    lock_polygon.acquire()
-                    queue_quad_cells.put([curr_segment[0], next_segment[0], next_vertex, curr_vertex])
-                    lock_polygon.release()
+                    # lock_polygon.acquire()
+                    queue_quad_cells.append([curr_segment[0], next_segment[0], next_vertex, curr_vertex])
+                    # lock_polygon.release()
                     done[0] = True
 
             if (next_segment[1] is not None):
                 # check the lower polygon
                 if (check_quad_polygon(curr_vertex, curr_segment[0], next_vertex, next_segment[1], obstacles)):
-                    lock_polygon.acquire()
-                    queue_quad_cells.put([curr_segment[0], next_vertex, next_segment[1], curr_vertex])
-                    lock_polygon.release()
+                    # lock_polygon.acquire()
+                    queue_quad_cells.append([curr_segment[0], next_vertex, next_segment[1], curr_vertex])
+                    # lock_polygon.release()
                     done[0] = True
 
             if (next_segment[0] is None and next_segment[1] is None):
                 if (check_right_tri_polygon(curr_vertex, curr_segment[0], next_vertex, obstacles)):
-                    lock_polygon.acquire()
-                    queue_right_tri_cells.put([curr_segment[0], next_vertex, curr_vertex])
-                    lock_polygon.release()
+                    # lock_polygon.acquire()
+                    queue_right_tri_cells.append([curr_segment[0], next_vertex, curr_vertex])
+                    # lock_polygon.release()
                     done[0] = True
 
         # check whether there is a polygon use the [current_vertex, current_segment[1]] as boundary
@@ -290,91 +261,74 @@ def generate_naive_polyfon_basic(index, open_line_segments, sorted_vertices, obs
             if (next_segment[1] is not None):
                 # check the lowerer polygon
                 if (check_quad_polygon(curr_vertex, curr_segment[1], next_vertex, next_segment[1], obstacles)):
-                    lock_polygon.acquire()
-                    queue_quad_cells.put([curr_vertex, next_vertex, next_segment[1], curr_segment[1]])
-                    lock_polygon.release()
+                    # lock_polygon.acquire()
+                    queue_quad_cells.append([curr_vertex, next_vertex, next_segment[1], curr_segment[1]])
+                    # lock_polygon.release()
                     done[1] = True
             # print(current_vertex)
 
             if (next_segment[0] is not None):
                 # check the lower polygon
                 if (check_quad_polygon(curr_vertex, curr_segment[1], next_vertex, next_segment[0], obstacles)):
-                    lock_polygon.acquire()
-                    queue_quad_cells.put([curr_vertex, next_segment[0], next_vertex, curr_segment[1]])
-                    lock_polygon.release()
+                    # lock_polygon.acquire()
+                    queue_quad_cells.append([curr_vertex, next_segment[0], next_vertex, curr_segment[1]])
+                    # lock_polygon.release()
                     done[1] = True
             # print(curr_vertex)
 
             if (next_segment[0] is None and next_segment[1] is None):
                 if (check_right_tri_polygon(curr_vertex, curr_segment[1], next_vertex, obstacles)):
-                    lock_polygon.acquire()
-                    queue_right_tri_cells.put([curr_vertex, next_vertex, curr_segment[1]])
-                    lock_polygon.release()
+                    # lock_polygon.acquire()
+                    queue_right_tri_cells.append([curr_vertex, next_vertex, curr_segment[1]])
+                    # lock_polygon.release()
                     done[1] = True
 
         if (done[2] is False):
             if (next_segment[0] is not None):
                 if (check_left_tri_polygon(curr_vertex, next_segment[0], next_vertex, obstacles)):
-                    lock_polygon.acquire()
-                    queue_left_tri_cells.put([curr_vertex, next_segment[0], next_vertex])
-                    lock_polygon.release()
+                    # lock_polygon.acquire()
+                    queue_left_tri_cells.append([curr_vertex, next_segment[0], next_vertex])
+                    # lock_polygon.release()
                     done[2] = True
 
             if (next_segment[1] is not None):
                 if (check_left_tri_polygon(curr_vertex, next_segment[1], next_vertex, obstacles)):
-                    lock_polygon.acquire()
-                    queue_left_tri_cells.put([curr_vertex, next_vertex, next_segment[1]])
-                    lock_polygon.release()
+                    # lock_polygon.acquire()
+                    queue_left_tri_cells.append([curr_vertex, next_vertex, next_segment[1]])
+                    # lock_polygon.release()
                     done[2] = True
 
         if done[0] == True and done[1] == True and done[2] == True:
             break
 
 # generate naive polygon
-def generate_naive_polygon_mp(open_line_segments, sorted_vertices, obstacles):
+def generate_naive_polygon_mp(open_line_segments_manager_list,
+                              sorted_vertices_manager_list,
+                              obstacles_manager_list,
+                              pool, manager):
 
-    quad_cells = []
-    left_tri_cells = []
-    right_tri_cells = []
+    quad_cells_manager_list = manager.list()
+    left_tri_cells_manager_list = manager.list()
+    right_tri_cells_manager_list = manager.list()
 
+    len_vertex = len(open_line_segments_manager_list)
 
-    len_vertex = len(open_line_segments)
-    queue_quad_cells = multiprocessing.Queue()
-    queue_left_tri_cells = multiprocessing.Queue()
-    queue_right_tri_cells = multiprocessing.Queue()
-    lock_polygon = multiprocessing.Lock()
+    multi_results = [pool.apply_async(func=generate_naive_polyfon_basic,
+                                      args=(index, open_line_segments_manager_list, sorted_vertices_manager_list, obstacles_manager_list,
+                                            quad_cells_manager_list, left_tri_cells_manager_list, right_tri_cells_manager_list))
+                     for index in range(len_vertex)]
 
-    p_list = []
-    for index in range(len_vertex):
-        # print(index, 'create process')
-        p_list.append(multiprocessing.Process(target=generate_naive_polyfon_basic, args=(index, open_line_segments, sorted_vertices, obstacles,
-                                 queue_quad_cells, queue_left_tri_cells, queue_right_tri_cells, lock_polygon)))
+    for res in multi_results:
+        res.get()
 
-    for p in p_list:
-        p.start()
-        # print(p.pid, 'start')
+    return quad_cells_manager_list, left_tri_cells_manager_list, right_tri_cells_manager_list
 
-    for p in p_list:
-        p.join()
-        # print(p.pid, 'join')
+def refine_quad_cells_mp(quad_cells_manager_list, pool, manager):
+    merge_overlapping_quad_cell_mp(quad_cells_manager_list, pool, manager)
+    remove_duplicate_cell_mp(quad_cells_manager_list, pool, manager)
+    remove_new_added_merged_cell_mp(quad_cells_manager_list, pool, manager)
 
-    while queue_quad_cells.empty() is False:
-        quad_cells.append(queue_quad_cells.get())
-
-    while queue_right_tri_cells.empty() is False:
-        right_tri_cells.append(queue_right_tri_cells.get())
-
-    while queue_left_tri_cells.empty() is False:
-        left_tri_cells.append(queue_left_tri_cells.get())
-
-    return quad_cells, left_tri_cells, right_tri_cells
-
-def refine_quad_cells_mp(quad_cells):
-    merge_overlapping_quad_cell_mp(quad_cells)
-    remove_duplicate_cell_mp(quad_cells)
-    remove_new_added_merged_cell_mp(quad_cells)
-
-def merge_overlapping_quad_cell_baisc(index, quad_cells, queue_quad_cells_remove, queue_quad_cells_add, lock_quad_cells):
+def merge_overlapping_quad_cell_baisc(index, quad_cells, queue_quad_cells_remove, queue_quad_cells_add):
     # quad_cells = [i for i in cells if len(i)>3]
     # tri_cells = [i for i in cells if len(i)==3]
     # others = [i for i in cells if len(i)<3]
@@ -401,133 +355,125 @@ def merge_overlapping_quad_cell_baisc(index, quad_cells, queue_quad_cells_remove
 
                 if (area1 + area2 >= area3):
                     # merge
-                    lock_quad_cells.acquire()
-                    queue_quad_cells_remove.put(index)
-                    queue_quad_cells_remove.put(index_cell2)
-                    queue_quad_cells_add.put(new_quad)
-                    lock_quad_cells.release()
+                    queue_quad_cells_remove.append(index)
+                    queue_quad_cells_remove.append(index_cell2)
+                    queue_quad_cells_add.append(new_quad)
 
-def merge_overlapping_quad_cell_mp(quad_cells):
+def merge_overlapping_quad_cell_mp(quad_cells_manager_list, pool, manager):
     # quad_cells = [i for i in cells if len(i)>3]
     # tri_cells = [i for i in cells if len(i)==3]
     # others = [i for i in cells if len(i)<3]
 
     quads_to_remove = set()
-    quads_to_add = []
-    len_vertex = len(quad_cells)
-    queue_quad_cells_remove = multiprocessing.Queue()
-    queue_quad_cells_add = multiprocessing.Queue()
-    lock_quad_cells = multiprocessing.Lock()
+    len_cells = len(quad_cells_manager_list)
 
-    p_list = []
-    for index in range(len_vertex):
-        p_list.append(multiprocessing.Process(target=merge_overlapping_quad_cell_baisc,
-                                              args=(index, quad_cells, queue_quad_cells_remove, queue_quad_cells_add, lock_quad_cells)))
+    quad_cells_remove_manager_list = manager.list()
+    quads_cells_add_manager_list = manager.list()
 
-    for p in p_list:
-        p.start()
+    multi_results = [pool.apply_async(func=merge_overlapping_quad_cell_baisc,
+                                              args=(index, quad_cells_manager_list,
+                                                    quad_cells_remove_manager_list, quads_cells_add_manager_list))
+                     for index in range(len_cells)]
 
-    for p in p_list:
-        p.join()
+    for res in multi_results:
+        res.get()
 
-    while queue_quad_cells_remove.empty() is False:
-        quads_to_remove.add(queue_quad_cells_remove.get())
-
-    while queue_quad_cells_add.empty() is False:
-        quads_to_add.append(queue_quad_cells_add.get())
+    for remove_index in quad_cells_remove_manager_list:
+        quads_to_remove.add(remove_index)
 
     # generate the reversed array, so that deleting one element will not affect the element before
     for index in sorted(quads_to_remove, reverse=True):
-        del quad_cells[index]
+        del quad_cells_manager_list[index]
 
-    for i in quads_to_add:
-        quad_cells.append(i)
+    for add_polygon in quads_cells_add_manager_list:
+        quad_cells_manager_list.append(add_polygon)
 
 
-def remove_duplicate_cell_basic(index, quad_cells, queue_quad_cells_remove, lock_quad_cells):
+def remove_duplicate_cell_basic(index, quad_cells, queue_quad_cells_remove):
     # # Remove duplicates
-    to_remove = []
-    for index1 in range(len(quad_cells)):
-        for index2 in range(index1 + 1, len(quad_cells)):
-            duplicate = True
-            for k, m in zip(quad_cells[index1], quad_cells[index2]):
-                if k.equals(m) is False:
-                    duplicate = False
-                    break
-            if (duplicate is True):
-                if index2 not in to_remove:
-                    lock_quad_cells.acquire()
-                    queue_quad_cells_remove.put(index2)
-                    lock_quad_cells.release()
+    for index2 in range(index + 1, len(quad_cells)):
+        duplicate = True
+        for k, m in zip(quad_cells[index], quad_cells[index2]):
+            if k.equals(m) is False:
+                duplicate = False
+                break
+        if (duplicate is True):
+                queue_quad_cells_remove.append(index2)
 
 
 
-def remove_duplicate_cell_mp(quad_cells):
+def remove_duplicate_cell_mp(quad_cells_manager_list, pool, manager):
+
     quads_to_remove = set()
-    len_vertex = len(quad_cells)
-    queue_quad_cells_remove = multiprocessing.Queue()
-    lock_quad_cells = multiprocessing.Lock()
+    len_cells = len(quad_cells_manager_list)
+    quad_cells_remove_manager_list = manager.list()
 
-    p_list = []
-    for index in range(len_vertex):
-        p_list.append(multiprocessing.Process(target=remove_duplicate_cell_basic,
-                                              args=(index, quad_cells, queue_quad_cells_remove, lock_quad_cells)))
+    multi_results = [pool.apply_async(func=remove_duplicate_cell_basic,
+                                      args=(index, quad_cells_manager_list, quad_cells_remove_manager_list))
+                     for index in range(len_cells)]
 
-    for p in p_list:
-        p.start()
+    for res in multi_results:
+        res.get()
 
-    for p in p_list:
-        p.join()
+    for remove_index in quad_cells_remove_manager_list:
+        quads_to_remove.add(remove_index)
 
-    while queue_quad_cells_remove.empty() is False:
-        quads_to_remove.add(queue_quad_cells_remove.get())
+    # generate the reversed array, so that deleting one element will not affect the element before
+
 
     for index in sorted(quads_to_remove, reverse=True):
-        del quad_cells[index]
+        del quad_cells_manager_list[index]
+
+    # print(len(quad_cells_manager_list))
+    # for index, cell in enumerate(quad_cells_manager_list):
+    #     print('index ', index)
+    #     for pnt in cell:
+    #         print(pnt)
 
 
-
-def remove_new_added_merged_cell_basic(index, quad_cells, queue_quad_cells_remove, lock_quad_cells):
+def remove_new_added_merged_cell_basic(index, quad_cells, queue_quad_cells_remove):
     # since in the previous procedure, we add new quad_cell, then will be a chance that we introduce new overlapping cell
-    quads_to_remove = []
-    for index1 in range(len(quad_cells)):
-        for index2 in range(len(quad_cells)):
-            if (index1 != index2 and quad_cells[index1][0].x == quad_cells[index2][0].x and quad_cells[index1][1].x ==
-                    quad_cells[index2][1].x):
+    for index2 in range(len(quad_cells)):
+        if (index != index2 and quad_cells[index][0].x == quad_cells[index2][0].x and quad_cells[index][1].x ==
+                quad_cells[index2][1].x):
 
-                if ((quad_cells[index1][0].y <= quad_cells[index2][0].y) and (
-                        quad_cells[index1][1].y <= quad_cells[index2][1].y)
-                        and (quad_cells[index1][2].y >= quad_cells[index2][2].y) and (
-                                quad_cells[index1][3].y >= quad_cells[index2][3].y)):
-                    lock_quad_cells.acquire()
-                    queue_quad_cells_remove.put(index2)
-                    lock_quad_cells.release()
+            if ((quad_cells[index][0].y <= quad_cells[index2][0].y) and (
+                    quad_cells[index][1].y <= quad_cells[index2][1].y)
+                    and (quad_cells[index][2].y >= quad_cells[index2][2].y) and (
+                            quad_cells[index][3].y >= quad_cells[index2][3].y)):
+                # lock_quad_cells.acquire()
+                queue_quad_cells_remove.append(index2)
+                # lock_quad_cells.release()
 
 
-def remove_new_added_merged_cell_mp(quad_cells):
+def remove_new_added_merged_cell_mp(quad_cells_manager_list, pool, manager):
     quads_to_remove = set()
-    len_vertex = len(quad_cells)
-    queue_quad_cells_remove = multiprocessing.Queue()
-    lock_quad_cells = multiprocessing.Lock()
+    len_cells = len(quad_cells_manager_list)
+    quad_cells_remove_manager_list = manager.list()
 
-    p_list = []
-    for index in range(len_vertex):
-        p_list.append(multiprocessing.Process(target=remove_new_added_merged_cell_basic,
-                                              args=(index, quad_cells, queue_quad_cells_remove, lock_quad_cells)))
+    multi_results = [pool.apply_async(func=remove_new_added_merged_cell_basic,
+                                      args=(index, quad_cells_manager_list, quad_cells_remove_manager_list))
+                     for index in range(len_cells)]
 
-    for p in p_list:
-        p.start()
+    for res in multi_results:
+        res.get()
 
-    for p in p_list:
-        p.join()
+    for remove_index in quad_cells_remove_manager_list:
+        quads_to_remove.add(remove_index)
 
-    while queue_quad_cells_remove.empty() is False:
-        quads_to_remove.add(queue_quad_cells_remove.get())
+    # generate the reversed array, so that deleting one element will not affect the element before
 
     for index in sorted(quads_to_remove, reverse=True):
-        del quad_cells[index]
+        del quad_cells_manager_list[index]
 
-def generate_node_set_basic(index, nodes, width, queue_nodes, lock_nodes, step=None, safeWidth=None):
+    # print(len(quad_cells_manager_list))
+    # for index, cell in enumerate(quad_cells_manager_list):
+    #     print('index ', index)
+    #     for pnt in cell:
+    #         print(pnt)
+
+
+def generate_node_set_basic(index, nodes, width, queue_nodes, step=None, safeWidth=None):
     curr_node = nodes[index]
     for next_node in nodes:
         if (next_node.index != curr_node.index):
@@ -563,40 +509,27 @@ def generate_node_set_basic(index, nodes, width, queue_nodes, lock_nodes, step=N
     curr_node.calculate_distance()
     curr_node.inside_path = sweep(curr_node.polygon, width, step, safeWidth)
 
-    lock_nodes.acquire()
-    queue_nodes.put(curr_node)
-    lock_nodes.release()
+    # lock_nodes.acquire()
+    return curr_node
+    # lock_nodes.release()
     # print(os.getpid(), 'add node done')
 
 
-def generate_node_set_mp(cells, width, step=None, safeWidth=None):
-    nodes = []
+def generate_node_set_mp(all_cell_manager_list, pool, manager, width, step=None, safeWidth=None):
+    init_nodes = []
 
-    initialize_node_set(nodes, cells)
+    initialize_node_set(init_nodes, all_cell_manager_list)
     # print('length of nodes', len(nodes))
-    len_node = len(nodes)
+    len_node = len(init_nodes)
 
-    queue_nodes = multiprocessing.Queue()
-    lock_nodes = multiprocessing.Lock()
-    p_list = []
-    for index in range(len_node):
-        # print(index, 'create process')
-        p_list.append(multiprocessing.Process(target=generate_node_set_basic,
-                                              args=(index, nodes, width, queue_nodes, lock_nodes, step, safeWidth)))
+    nodes_manager_list = manager.list()
 
-    for p in p_list:
-        p.start()
-        # print(p.pid, 'start')
-
-    time.sleep(5)
-
-    # print('join')
-    # print('length', len(p_list))
+    multi_results = [pool.apply_async(func=generate_node_set_basic,
+                                      args=(index, init_nodes, width, nodes_manager_list, step, safeWidth))
+                     for index in range(len_node)]
     nodes = []
-    for p in p_list:
-        p.join()
-        nodes.append(queue_nodes.get())
-        # print(p.pid, 'join')
+    for res in multi_results:
+        nodes.append(res.get())
 
     ##########################################
     # Because the size of queue is limited, so that we choose to append the list once we join a process
@@ -634,8 +567,7 @@ def get_middle_pnt(nodes, n1, n2):
     return None
 
 
-def generate_two_node_path(index, n1, n2, st_path_matrix, nodes, queue_path, lock_path, step=None):
-    temp_path = st_path_matrix[n1][n2]
+def generate_two_node_path(index, temp_path, nodes, step=None):
     medium_path = []
     for i in range(len(temp_path) - 1):
         start_pnt = nodes[temp_path[i]].centroid
@@ -656,32 +588,25 @@ def generate_two_node_path(index, n1, n2, st_path_matrix, nodes, queue_path, loc
             medium_path = medium_path + step_path
 
     medium_path.append(nodes[temp_path[-1]].centroid)
-    lock_path.acquire()
-    queue_path.put([index, medium_path])
-    lock_path.release()
+    # lock_path.acquire()
+    return [index, medium_path]
+    # lock_path.release()
 
 
-def generate_path_mp(st_path, st_path_matrix, nodes, step=None):
+def generate_path_mp(st_path, st_path_matrix_manager_list, nodes_manager_list, pool, manager, step=None):
 
 
-    queue_path = multiprocessing.Queue()
-    lock_path = multiprocessing.Lock()
-
-    p_list = []
+    path_manager_list = manager.list()
     len_path = len(st_path) - 1
-    path = [[]] * len_path
-    for index in range(len(st_path) - 1):
-        p_list.append(multiprocessing.Process(target=generate_two_node_path,
-                      args=(index, st_path[index], st_path[index + 1], st_path_matrix, nodes, queue_path, lock_path, step)))
+    paths = []
+    multi_results = [pool.apply_async(func=generate_two_node_path,
+                                      args=(index, st_path_matrix_manager_list[st_path[index]][st_path[index + 1]],
+                                            nodes_manager_list, step))
+                     for index in range(len_path)]
 
-    for p in p_list:
-        p.start()
+    for res in multi_results:
+        paths.append(res.get())
 
-    for p in p_list:
-        p.join()
+    paths.sort(key = lambda path: path[0])
 
-    while queue_path.empty() is False:
-        temp_path = queue_path.get()
-        path[temp_path[0]] = temp_path[1]
-
-    return path
+    return paths
