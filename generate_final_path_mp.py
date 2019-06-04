@@ -28,25 +28,9 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth,
 
     # img is the input image, approxes are the generated polygon
     img, approxes = generate_polygon_countour(img_file_name)
-    for approx in approxes:
-        img = cv2.drawContours(img, [approx], 0, (0, 255, 0), 3)
 
-    # generate the boundary by getting the min/max value of all polygon
-    polygons = [np.squeeze(x) for x in approxes]
-
-    y_limit_lower = min([pt[1] for pt in polygons[0]])
-    y_limit_upper = max([pt[1] for pt in polygons[0]])
-
-    x_limit_lower = min([pt[0] for pt in polygons[0]])
-    x_limit_upper = max([pt[0] for pt in polygons[0]])
-
-    # boundary_basic certex order
-    boundary_basic = [[x_limit_lower, y_limit_lower], [x_limit_upper, y_limit_lower], [x_limit_upper, y_limit_upper],
-                      [x_limit_lower, y_limit_upper]]
-
-    # Among all the polygon cv2 generated, [1:] are the inner obstacles
-    obstacles_basic = polygons[1:]
-
+    # genenrate basic
+    [y_limit_lower, y_limit_upper, x_limit_lower, x_limit_upper], boundary_basic, obstacles_basic = generate_baisc(approxes)
 
     obstacles_basic_manager_list = manager.list(obstacles_basic)
 
@@ -92,37 +76,13 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth,
     refine_quad_cells_mp(quad_cells_manager_list, pool, manager, unit)
     print("time:", time.time() - t)
 
+    # add the boundary cells to the quad_cells
+    add_boundary_cells(boundary, sorted_vertices, quad_cells_manager_list, y_limit_lower, y_limit_upper)
 
 
-    # Add boundary cell
-    if (boundary[0].x != sorted_vertices[0].x):
-        # quad_cells.append(
-        quad_cells_manager_list.append(
-            [boundary[0], point(sorted_vertices[0].x, y_limit_lower), point(sorted_vertices[0].x, y_limit_upper),
-             boundary[3]])
-    if (boundary[1].x != sorted_vertices[len(sorted_vertices) - 1].x):
-        # quad_cells.append(
-        quad_cells_manager_list.append(
-            [point(sorted_vertices[len(sorted_vertices) - 1].x, y_limit_lower), boundary[1], boundary[2],
-             point(sorted_vertices[len(sorted_vertices) - 1].x, y_limit_upper)])
-
-    # combine all the cells
-    # all_cell = quad_cells+left_tri_cells+right_tri_cells
-    all_cell = []
-    for quar_cell in quad_cells_manager_list:
-        all_cell.append(quar_cell)
-
-    for left_tri_cell in left_tri_cells_manager_list:
-        all_cell.append(left_tri_cell)
-
-    for right_tri_cell in right_tri_cells_manager_list:
-        all_cell.append(right_tri_cell)
-
-    # sort the cell based on teh x-value of the first point
-    ################-----   IMPORTANT  -----##################
-    all_cell.sort(key=lambda pnt: pnt[0].x)
+    # get all sorted cells
+    all_cell = get_sorted_cells(quad_cells_manager_list, left_tri_cells_manager_list, right_tri_cells_manager_list)
     all_cell_manager_list = manager.list(all_cell)
-
 
 
     # genenrate node set, inside path without step
@@ -134,35 +94,20 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth,
     print("time:", time.time() - t)
 
 
-    # get the adjacency matrix
-    adjacency_matrix = get_adjacency_matrix(nodes)
+    # generate left_tri_matrix using graph algorithm for generating the shortest path
+    left_tri_matrix, st_path_matrix = generate_left_tri_matrix(nodes)
 
-    # Dijkstra’s shortest path algorithm to get the shortest distance from the root to the target given adjacency matrix
-    # use each node as root node iteratively to generate the distance matrix
-
-    # generate a fully connected graph
-    num_node = len(nodes)
-    g = Graph(num_node)
-    g.graph = adjacency_matrix
-    g.generate_distance_st_matrix()
-
-    distance_matrix = np.array(g.distance_matrix)
-
-    # in order to use the solve_tsp command, we need to convert the distance matrix to a left_triangular_matrix
-    left_tri_matrix = []
-    for i in range(0, num_node):
-        temp = list(np.split(distance_matrix[i], [i])[0])
-        left_tri_matrix.append(temp)
 
     # use the tsp package to get the shortest path to visit all the nodes
-    shortest_path_node = solve_tsp(left_tri_matrix, endpoints=(0, num_node - 1))
+    shortest_path_node = solve_tsp(left_tri_matrix, endpoints=(0, len(nodes) - 1))
     # go back to the origin node 0
     shortest_path_node.append(shortest_path_node[0])
+
 
     # generate the path to travel through all node in shortest_path_node
     t = time.time()
     print('generate_path_mp')
-    st_path_matrix_manager_list = manager.list(g.st_path_matrix)
+    st_path_matrix_manager_list = manager.list(st_path_matrix)
     # new_path_node = generate_path(shortest_path_node, g.st_path_matrix, nodes, step)
     new_path_node = generate_path_mp(shortest_path_node, st_path_matrix_manager_list, nodes_manager_list, pool, manager, step)
     # new_path_node here has a little difference from the serial version
@@ -176,7 +121,7 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth,
     final_path = []
     for i, node in enumerate(shortest_path_node):
         # go back to the origin node 0
-        if (i < num_node):
+        if (i < len(nodes)):
             final_path = final_path + nodes[node].inside_path + new_path_node[i][1]
 
     print('Total time without process start and end: ', time.time() - t_total_without_process_start_end)

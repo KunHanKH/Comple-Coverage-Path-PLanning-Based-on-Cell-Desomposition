@@ -1,7 +1,9 @@
 from helpers.geometry import *
 import matplotlib.pyplot as plt
 from helpers.sweep import *
+from helpers.graph import *
 import cv2
+import numpy as np
 import multiprocessing
 import time
 import os
@@ -61,6 +63,7 @@ def draw_node(nodes, boundary, obstacles, fill=None):
         plt.annotate('cell-{}'.format(index), xy=(center.x, center.y))
 
 
+
 def generate_polygon_countour(image_name, filter=None, sp=None, sr=None):
     img = cv2.imread(image_name)
     if (filter):
@@ -74,6 +77,84 @@ def generate_polygon_countour(image_name, filter=None, sp=None, sr=None):
         episilon = 0.01 * cv2.arcLength(cnt, True)
         approxes.append(cv2.approxPolyDP(cnt, episilon, True))
     return [img, approxes]
+
+
+def generate_baisc(approxes):
+    # generate the boundary by getting the min/max value of all polygon
+    polygons = [np.squeeze(x) for x in approxes]
+
+    y_limit_lower = min([pt[1] for pt in polygons[0]])
+    y_limit_upper = max([pt[1] for pt in polygons[0]])
+
+    x_limit_lower = min([pt[0] for pt in polygons[0]])
+    x_limit_upper = max([pt[0] for pt in polygons[0]])
+
+    # boundary_basic certex order
+    boundary_basic = [[x_limit_lower, y_limit_lower], [x_limit_upper, y_limit_lower], [x_limit_upper, y_limit_upper],
+                      [x_limit_lower, y_limit_upper]]
+
+    # Among all the polygon cv2 generated, [1:] are the inner obstacles
+    obstacles_basic = polygons[1:]
+
+    return [y_limit_lower, y_limit_upper, x_limit_lower,x_limit_upper], boundary_basic, obstacles_basic
+
+
+def add_boundary_cells(boundary, sorted_vertices, quad_cells_manager_list, y_limit_lower, y_limit_upper):
+    # Add boundary cell
+    if boundary[0].x != sorted_vertices[0].x:
+        # quad_cells.append(
+        quad_cells_manager_list.append(
+            [boundary[0], point(sorted_vertices[0].x, y_limit_lower), point(sorted_vertices[0].x, y_limit_upper),
+             boundary[3]])
+    if boundary[1].x != sorted_vertices[len(sorted_vertices) - 1].x:
+        # quad_cells.append(
+        quad_cells_manager_list.append(
+            [point(sorted_vertices[len(sorted_vertices) - 1].x, y_limit_lower), boundary[1], boundary[2],
+             point(sorted_vertices[len(sorted_vertices) - 1].x, y_limit_upper)])
+
+
+def get_sorted_cells(quad_cells_manager_list, left_tri_cells_manager_list, right_tri_cells_manager_list):
+    # combine all the cells
+    # all_cell = quad_cells+left_tri_cells+right_tri_cells
+    all_cell = []
+    for quar_cell in quad_cells_manager_list:
+        all_cell.append(quar_cell)
+
+    for left_tri_cell in left_tri_cells_manager_list:
+        all_cell.append(left_tri_cell)
+
+    for right_tri_cell in right_tri_cells_manager_list:
+        all_cell.append(right_tri_cell)
+
+    # sort the cell based on teh x-value of the first point
+    ################-----   IMPORTANT  -----##################
+    all_cell.sort(key=lambda pnt: pnt[0].x)
+    return all_cell
+
+
+def generate_left_tri_matrix(nodes):
+    # get the adjacency matrix
+    adjacency_matrix = get_adjacency_matrix(nodes)
+
+    # Dijkstra’s shortest path algorithm to get the shortest distance from the root to the target given adjacency matrix
+    # use each node as root node iteratively to generate the distance matrix
+
+    # generate a fully connected graph
+    num_node = len(nodes)
+    g = Graph(num_node)
+    g.graph = adjacency_matrix
+    g.generate_distance_st_matrix()
+
+    distance_matrix = np.array(g.distance_matrix)
+
+    # in order to use the solve_tsp command, we need to convert the distance matrix to a left_triangular_matrix
+    left_tri_matrix = []
+    for i in range(0, num_node):
+        temp = list(np.split(distance_matrix[i], [i])[0])
+        left_tri_matrix.append(temp)
+
+    return left_tri_matrix, g.st_path_matrix
+
 
 # generate vertex node
 def generate_vertex_point_basic(obstacle):
