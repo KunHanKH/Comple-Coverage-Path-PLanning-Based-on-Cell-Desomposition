@@ -8,7 +8,7 @@ To generate the final path, run the following code:
 `python generate_final_path.py img_file_name output_file_name width step safeWidth`
 
 We also provide multiprocessing version:
-`python generate_final_path_mp.py img_file_name output_file_name width step safeWidth unit`
+`python generate_final_path_mp.py img_file_name output_file_name width step safeWidth num_processes unit`
 
 
 
@@ -18,7 +18,7 @@ In our example:
 
 If you want to use multi_processing:
 
-`python generate_final_path_mp.py new_paint.png output.csv 20 -1 20 2`
+`python generate_final_path_mp.py new_paint.png output.csv 20 -1 20 4 2`
 
 where `step` and `safewidth` could be set to `-1`, if you don't want to consider the step and safe width problem.
 
