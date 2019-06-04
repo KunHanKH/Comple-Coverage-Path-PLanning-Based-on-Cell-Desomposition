@@ -473,47 +473,50 @@ def remove_new_added_merged_cell_mp(quad_cells_manager_list, pool, manager, unit
     #         print(pnt)
 
 
-def generate_node_set_basic(index, nodes, width, queue_nodes, step=None, safeWidth=None):
-    curr_node = nodes[index]
-    for next_node in nodes:
-        if (next_node.index != curr_node.index):
-            # define the type
-            # 1: quad_cell
-            # 2: left_tri_cell: left side has only one point
-            # 3: right_tri_cell: right side has only one point
+def generate_node_set_basic(index, len_node, unit, nodes, width, queue_nodes, step=None, safeWidth=None):
+    while unit > 0:
+        if index < len_node:
+            curr_node = nodes[index]
+            for next_node in nodes:
+                if (next_node.index != curr_node.index):
+                    # define the type
+                    # 1: quad_cell
+                    # 2: left_tri_cell: left side has only one point
+                    # 3: right_tri_cell: right side has only one point
 
-            # get adjacent nodes
-            if ((curr_node.type == 1 or curr_node.type == 2) and
-                    (next_node.type == 1 or next_node.type == 3)):
-                if (curr_node.polygon[1].x == next_node.polygon[0].x):
-                    if ((max(curr_node.polygon[2].y, next_node.polygon[-1].y) - min(curr_node.polygon[1].y,
-                                                                                    next_node.polygon[0].y))
-                            < (abs(curr_node.polygon[2].y - curr_node.polygon[1].y) + abs(
-                                next_node.polygon[-1].y - next_node.polygon[0].y))):
-                        curr_node.add_adjacent(next_node)
-    total_adjacent = curr_node.get_adjacent()
+                    # get adjacent nodes
+                    if ((curr_node.type == 1 or curr_node.type == 2) and
+                            (next_node.type == 1 or next_node.type == 3)):
+                        if (curr_node.polygon[1].x == next_node.polygon[0].x):
+                            if ((max(curr_node.polygon[2].y, next_node.polygon[-1].y) - min(curr_node.polygon[1].y,
+                                                                                            next_node.polygon[0].y))
+                                    < (abs(curr_node.polygon[2].y - curr_node.polygon[1].y) + abs(
+                                        next_node.polygon[-1].y - next_node.polygon[0].y))):
+                                curr_node.add_adjacent(next_node)
+            total_adjacent = curr_node.get_adjacent()
 
-    # add middle point and path to adjacent node
-    if (len(total_adjacent) == 1):
-        curr_node.add_middle_point(centroid([curr_node.polygon[1], curr_node.polygon[2]]))
-        curr_node.add_path_to_adjacency(
-            [curr_node.centroid, curr_node.middle_point[0], curr_node.adjacent[0].centroid])
+            # add middle point and path to adjacent node
+            if (len(total_adjacent) == 1):
+                curr_node.add_middle_point(centroid([curr_node.polygon[1], curr_node.polygon[2]]))
+                curr_node.add_path_to_adjacency(
+                    [curr_node.centroid, curr_node.middle_point[0], curr_node.adjacent[0].centroid])
 
-    elif (len(total_adjacent) >= 1):
-        for i, ad_node in enumerate(total_adjacent):
-            curr_node.add_middle_point(centroid([ad_node.polygon[0], ad_node.polygon[-1]]))
-            curr_node.add_path_to_adjacency(
-                [curr_node.centroid, curr_node.middle_point[i], curr_node.adjacent[i].centroid])
+            elif (len(total_adjacent) >= 1):
+                for i, ad_node in enumerate(total_adjacent):
+                    curr_node.add_middle_point(centroid([ad_node.polygon[0], ad_node.polygon[-1]]))
+                    curr_node.add_path_to_adjacency(
+                        [curr_node.centroid, curr_node.middle_point[i], curr_node.adjacent[i].centroid])
 
-    # calculate the distance to the adjacent node
-    curr_node.calculate_distance()
-    curr_node.inside_path = sweep(curr_node.polygon, width, step, safeWidth)
+            # calculate the distance to the adjacent node
+            curr_node.calculate_distance()
+            curr_node.inside_path = sweep(curr_node.polygon, width, step, safeWidth)
 
-    # lock_nodes.acquire()
-    return curr_node
+            queue_nodes.append(curr_node)
+        index += 1
+        unit -= 1
 
 
-def generate_node_set_mp(all_cell_manager_list, pool, manager, width, step=None, safeWidth=None):
+def generate_node_set_mp(all_cell_manager_list, pool, manager, width, step=None, safeWidth=None, unit=2):
     init_nodes = []
 
     initialize_node_set(init_nodes, all_cell_manager_list)
@@ -523,11 +526,14 @@ def generate_node_set_mp(all_cell_manager_list, pool, manager, width, step=None,
     nodes_manager_list = manager.list()
 
     multi_results = [pool.apply_async(func=generate_node_set_basic,
-                                      args=(index, init_nodes, width, nodes_manager_list, step, safeWidth))
-                     for index in range(len_node)]
+                                      args=(index, len_node, unit, init_nodes, width, nodes_manager_list, step, safeWidth))
+                     for index in range(0, len_node, unit)]
     nodes = []
     for res in multi_results:
-        nodes.append(res.get())
+        res.get()
+
+    for node in nodes_manager_list:
+        nodes.append(node)
 
     ##########################################
     # Because the size of queue is limited, so that we choose to append the list once we join a process

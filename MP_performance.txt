@@ -54,10 +54,10 @@ time: 0.06582427024841309
 MP_Add_Unit_to_func(generate_naive_polygon_mp)_and_func(refine_quad_cells_mp)
 
 The reason that other funcs doesn't involve unit:
-	extract_vertex_mp: already use Pool.map()
-	get_vertical_line_mp: need to sort based on the x-value, adding unit needs to use Queue or Manager. Unnecessary memory operation.
-	generate_node_set_mp: same as above
-	generate_path_mp: sort based on the shortest path sequence, others same as above
+	extract_vertex_mp: 		already use Pool.map()
+	get_vertical_line_mp: 	need to sort based on the x-value, adding unit needs to use Queue or Manager. Unnecessary memory operation.
+	generate_node_set_mp: 	same as above
+	generate_path_mp: sort 	based on the shortest path sequence, others same as above
 
 extract_vertex_mp
 time: 0.012777566909790039
@@ -71,3 +71,74 @@ generate_node_set_mp
 time: 0.0400240421295166
 generate_path_mp
 time: 0.06182122230529785
+
+#############################################
+
+MP_Add_Unit_to_func(generate_node_set_mp)
+
+The reason that other funcs doesn't involve unit:
+
+	extract_vertex_mp:		already use Pool.map()
+	get_vertical_line_mp:	need to sort based on the x-value, adding unit needs to use Queue or Manager. Unnecessary memory operation.
+							Will use more shared data if add unit parameter
+	generate_path_mp: 		sort based on the shortest path sequence, others same as above
+							Will use more shared data if add unit parameter	
+
+Improve a little. 
+
+extract_vertex_mp
+time: 0.012952327728271484
+get_vertical_line_mp
+time: 0.04485511779785156
+generate_naive_polygon_mp
+time: 0.08941411972045898
+refine_quad_cells_mp
+time: 0.4919850826263428
+generate_node_set_mp
+time: 0.038895606994628906
+generate_path_mp
+time: 0.059841156005859375
+
+#############################################
+
+Final Comparation
+
+################
+Serial execution
+################
+extract_vertex_se
+time: 0.0
+get_vertical_line_se
+time: 0.004960060119628906
+generate_naive_polygon_se
+time: 0.05987191200256348
+refine_quad_cells_se
+time: 0.0019283294677734375
+generate_node_set_se
+time: 0.007016658782958984
+generate_path_se
+time: 0.0
+Total time:  0.09927487373352051
+path generated
+
+################
+Parallel execution
+################
+extract_vertex_mp
+time: 0.01369619369506836
+get_vertical_line_mp
+time: 0.04290199279785156
+generate_naive_polygon_mp
+time: 0.08855080604553223
+refine_quad_cells_mp
+time: 0.40442395210266113
+generate_node_set_mp
+time: 0.04621434211730957
+generate_path_mp
+time: 0.06576156616210938
+Total time:  2.0585391521453857
+path generated
+
+
+
+

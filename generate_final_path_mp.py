@@ -17,7 +17,10 @@ import multiprocessing
 from multiprocessing import Process, Pool, Manager
 
 
-def generate_final_path(img_file_name, output_file_name, width, step, safeWidth):
+def generate_final_path(img_file_name, output_file_name, width, step, safeWidth, num_processes=4, unit=2):
+
+    t_total = time.time()
+
     # img is the input image, approxes are the generated polygon
     img, approxes = generate_polygon_countour(img_file_name)
     for approx in approxes:
@@ -39,7 +42,7 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
     # Among all the polygon cv2 generated, [1:] are the inner obstacles
     obstacles_basic = polygons[1:]
 
-    pool = Pool(4)
+    pool = Pool(num_processes)
     manager = Manager()
     obstacles_basic_manager_list = manager.list(obstacles_basic)
 
@@ -74,15 +77,15 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
     quad_cells_manager_list, left_tri_cells_manager_list, right_tri_cells_manager_list = generate_naive_polygon_mp(open_line_segments_manager_list,
                                                                             sorted_vertices_manager_list,
                                                                             obstacles_manager_list,
-                                                                            pool, manager)
+                                                                            pool, manager, unit)
     print("time:", time.time() - t)
 
 
 
+    # refine_quad_cells(quad_cells)
     t = time.time()
     print('refine_quad_cells_mp')
-    # refine_quad_cells(quad_cells)
-    refine_quad_cells_mp(quad_cells_manager_list, pool, manager, unit=2)
+    refine_quad_cells_mp(quad_cells_manager_list, pool, manager, unit)
     print("time:", time.time() - t)
 
 
@@ -122,7 +125,7 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
     t = time.time()
     print('generate_node_set_mp')
     # nodes = generate_node_set(all_cell, width, step, safeWidth=20)
-    nodes = generate_node_set_mp(all_cell_manager_list, pool, manager, width, step, safeWidth=20)
+    nodes = generate_node_set_mp(all_cell_manager_list, pool, manager, width, step, safeWidth, unit)
     nodes_manager_list = manager.list(nodes)
     print("time:", time.time() - t)
 
@@ -153,9 +156,9 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
     shortest_path_node.append(shortest_path_node[0])
 
     # generate the path to travel through all node in shortest_path_node
-    st_path_matrix_manager_list = manager.list(g.st_path_matrix)
     t = time.time()
     print('generate_path_mp')
+    st_path_matrix_manager_list = manager.list(g.st_path_matrix)
     # new_path_node = generate_path(shortest_path_node, g.st_path_matrix, nodes, step)
     new_path_node = generate_path_mp(shortest_path_node, st_path_matrix_manager_list, nodes_manager_list, pool, manager, step)
     # new_path_node here has a little difference from the serial version
@@ -170,12 +173,15 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
 
     # final_path, include the inside path of each polygon
     final_path = []
-    plt.figure(figsize=(20, 10))
     for i, node in enumerate(shortest_path_node):
         # go back to the origin node 0
         if (i < num_node):
             final_path = final_path + nodes[node].inside_path + new_path_node[i][1]
 
+    print('Total time: ', time.time() - t_total)
+
+    # print image
+    plt.figure(figsize=(20, 10))
     draw_node(nodes, boundary, obstacles, fill=None)
     x = [pnt.x for pnt in final_path]
     y = [pnt.y for pnt in final_path]
@@ -188,6 +194,27 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
     plt.show()
 
 
+def main(argv):
+    assert len(argv) == 7, "need 7 parameters: img_file_name, output_file_name, width, step, safeWidth, num_processes, unit"
+    img_file_name = argv[0]
+    output_file_name = argv[1]
+    width = int(argv[2])
+
+    step = int(argv[3])
+    safeWidth = int(argv[4])
+    num_processes = int(argv[5])
+    unit = int(argv[6])
+
+    if step == -1:
+        step = None
+
+    if safeWidth == -1:
+        safeWidth = None
+
+
+    generate_final_path(img_file_name, output_file_name, width, step, safeWidth, num_processes, unit)
+    print("path generated")
+
+
 if __name__ == "__main__":
-    generate_final_path("new_paint.png", "output.csv", 20, None, 20)
-    print("Done!!!!!")
+    main(sys.argv[1:])
