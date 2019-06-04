@@ -121,22 +121,24 @@ time: 0.0
 Total time:  0.09927487373352051
 path generated
 
+
 ################
 Parallel execution
 ################
 extract_vertex_mp
-time: 0.01369619369506836
+time: 0.008975744247436523
 get_vertical_line_mp
-time: 0.04290199279785156
+time: 0.03790020942687988
 generate_naive_polygon_mp
-time: 0.08855080604553223
+time: 0.0747976303100586
 refine_quad_cells_mp
-time: 0.40442395210266113
+time: 0.4009277820587158
 generate_node_set_mp
-time: 0.04621434211730957
+time: 0.03789782524108887
 generate_path_mp
-time: 0.06576156616210938
-Total time:  2.0585391521453857
+time: 0.0608365535736084
+Total time without process start and end:  0.6502587795257568
+Total time:  2.0434200763702393
 path generated
 
 

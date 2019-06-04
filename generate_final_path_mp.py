@@ -21,6 +21,11 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth,
 
     t_total = time.time()
 
+    pool = Pool(num_processes)
+    manager = Manager()
+
+    t_total_without_process_start_end = time.time()
+
     # img is the input image, approxes are the generated polygon
     img, approxes = generate_polygon_countour(img_file_name)
     for approx in approxes:
@@ -42,8 +47,7 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth,
     # Among all the polygon cv2 generated, [1:] are the inner obstacles
     obstacles_basic = polygons[1:]
 
-    pool = Pool(num_processes)
-    manager = Manager()
+
     obstacles_basic_manager_list = manager.list(obstacles_basic)
 
     t = time.time()
@@ -168,15 +172,17 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth,
 
     print("time:", time.time() - t)
 
-    pool.close()
-    pool.join()
-
     # final_path, include the inside path of each polygon
     final_path = []
     for i, node in enumerate(shortest_path_node):
         # go back to the origin node 0
         if (i < num_node):
             final_path = final_path + nodes[node].inside_path + new_path_node[i][1]
+
+    print('Total time without process start and end: ', time.time() - t_total_without_process_start_end)
+
+    pool.close()
+    pool.join()
 
     print('Total time: ', time.time() - t_total)
 
