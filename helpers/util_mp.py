@@ -8,6 +8,8 @@ import multiprocessing
 import time
 import os
 from multiprocessing import Manager
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 
 # use cv2.pyrMeanShiftFiltering if filter = True
@@ -752,3 +754,29 @@ def generate_path_mp(st_path, st_path_matrix_manager_list, nodes_manager_list, p
     paths.sort(key = lambda path: path[0])
 
     return paths
+
+
+
+def generate_anamination(boundary, obstacles, cells, final_path, x_limit_lower, x_limit_upper, y_limit_lower, y_limit_upper, interval):
+    fig, ax = plt.subplots(figsize=(20, 10))
+
+    draw_cell(cells, boundary, obstacles)
+
+    xdata, ydata = [], []
+    ln, = plt.plot([], [], marker='o')
+
+    def init():
+        ax.set_xlim(x_limit_lower, x_limit_upper)
+        ax.set_ylim(y_limit_lower, y_limit_upper)
+        return ln,
+
+    def update(frame):
+        xdata.append(frame[0])
+        ydata.append(frame[1])
+        ln.set_data(xdata, ydata)
+        return ln,
+
+    ani = FuncAnimation(fig, update, frames=[[pnt.x, pnt.y] for pnt in final_path],
+                        init_func=init, blit=True, interval=interval, repeat=False)
+
+    plt.show()

@@ -99,6 +99,10 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth,
         plt.plot(pnt.x, pnt.y, marker='o')
     plt.show()
 
+    generate_anamination(boundary, obstacles, all_cell_manager_list, final_path,
+                         x_limit_lower, x_limit_upper, y_limit_lower, y_limit_upper, interval=50)
+
+
 
 def main(argv):
     assert len(argv) == 7, "need 7 parameters: img_file_name, output_file_name, width, step, safeWidth, num_processes, unit"
