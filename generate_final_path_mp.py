@@ -32,64 +32,18 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth,
     # genenrate basic
     [y_limit_lower, y_limit_upper, x_limit_lower, x_limit_upper], boundary_basic, obstacles_basic = generate_baisc(approxes)
 
-    obstacles_basic_manager_list = manager.list(obstacles_basic)
-
     t = time.time()
-    print('extract_vertex_mp')
-    # boundary, sorted_vertices, obstacles = extract_vertex(boundary_basic, obstacles_basic)
-    boundary, sorted_vertices, obstacles = extract_vertex_mp(boundary_basic, obstacles_basic_manager_list, pool)
-    sorted_vertices_manager_list = manager.list(sorted_vertices)
-    obstacles_manager_list = manager.list(obstacles)
+    all_cell_manager_list, boundary, sorted_vertices, obstacles = \
+    generate_cells_mp([y_limit_lower, y_limit_upper, x_limit_lower, x_limit_upper], boundary_basic, obstacles_basic, manager, pool, unit)
+    print('generate_cells_mp')
     print("time:", time.time() - t)
-
-
-    # generate vertical line
-    t = time.time()
-    print('get_vertical_line_mp')
-    # open_line_segments = get_vertical_line(sorted_vertices, obstacles, y_limit_lower, y_limit_upper)
-    open_line_segments = get_vertical_line_mp(sorted_vertices, y_limit_lower, y_limit_upper,
-                                              obstacles_manager_list, pool)
-    # open_line_segments here has a little difference from the serial version
-    # first value is the index based on the x-value
-    # [0, [245;0, 245;647]]
-    # [1, [278;0, 278;346]]
-    # ...
-    open_line_segments_manager_list = manager.list(open_line_segments)
-    print("time:", time.time() - t)
-
-    # Find Polygon cells naiively. Will improve next.
-    # open_line_segments and sorted_vertices has the same order of points, based on the x_value
-    t = time.time()
-    print('generate_naive_polygon_mp')
-    # quad_cells, left_tri_cells, right_tri_cells = generate_naive_polygon(open_line_segments, sorted_vertices, obstacles)
-    quad_cells_manager_list, left_tri_cells_manager_list, right_tri_cells_manager_list = generate_naive_polygon_mp(open_line_segments_manager_list,
-                                                                            sorted_vertices_manager_list,
-                                                                            obstacles_manager_list,
-                                                                            pool, manager, unit)
-    print("time:", time.time() - t)
-
-
-
-    # refine_quad_cells(quad_cells)
-    t = time.time()
-    print('refine_quad_cells_mp')
-    refine_quad_cells_mp(quad_cells_manager_list, pool, manager, unit)
-    print("time:", time.time() - t)
-
-    # add the boundary cells to the quad_cells
-    add_boundary_cells(boundary, sorted_vertices, quad_cells_manager_list, y_limit_lower, y_limit_upper)
-
-
-    # get all sorted cells
-    all_cell = get_sorted_cells(quad_cells_manager_list, left_tri_cells_manager_list, right_tri_cells_manager_list)
-    all_cell_manager_list = manager.list(all_cell)
 
 
     # genenrate node set, inside path without step
     t = time.time()
     print('generate_node_set_mp')
     # nodes = generate_node_set(all_cell, width, step, safeWidth=20)
-    nodes = generate_node_set_mp(all_cell_manager_list, pool, manager, width, step, safeWidth, unit)
+    nodes = generate_node_set_mp(all_cell_manager_list, pool, manager, width, step, safeWidth, unit=1)
     nodes_manager_list = manager.list(nodes)
     print("time:", time.time() - t)
 
@@ -108,7 +62,7 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth,
     t = time.time()
     print('generate_path_mp')
     st_path_matrix_manager_list = manager.list(st_path_matrix)
-    # new_path_node = generate_path(shortest_path_node, g.st_path_matrix, nodes, step)
+    # new_path_node = generate_path(shortest_path_node, st_path_matrix, nodes, step)
     new_path_node = generate_path_mp(shortest_path_node, st_path_matrix_manager_list, nodes_manager_list, pool, manager, step)
     # new_path_node here has a little difference from the serial version
     # first value is the index based on the shortest_path
@@ -122,6 +76,7 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth,
     for i, node in enumerate(shortest_path_node):
         # go back to the origin node 0
         if (i < len(nodes)):
+            # final_path = final_path + nodes[node].inside_path + new_path_node[i]
             final_path = final_path + nodes[node].inside_path + new_path_node[i][1]
 
     print('Total time without process start and end: ', time.time() - t_total_without_process_start_end)

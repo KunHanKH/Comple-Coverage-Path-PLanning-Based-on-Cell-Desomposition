@@ -106,39 +106,47 @@ Final Comparation
 ################
 Serial execution
 ################
-extract_vertex_se
-time: 0.0
-get_vertical_line_se
-time: 0.004960060119628906
-generate_naive_polygon_se
-time: 0.05987191200256348
-refine_quad_cells_se
-time: 0.0019283294677734375
+        ############ Inside generate_cells function ############
+        extract_vertex_se
+        time: 0.0
+        get_vertical_line_se
+        time: 0.015609025955200195
+        generate_naive_polygon_se
+        time: 0.07808542251586914
+        refine_quad_cells_se
+        time: 0.0
+        ########################################################
+generate_cells_se
+time: 0.09369444847106934
 generate_node_set_se
-time: 0.007016658782958984
+time: 0.015627622604370117
 generate_path_se
 time: 0.0
-Total time:  0.09927487373352051
+Total time:  0.12496781349182129
 path generated
 
 
 ################
 Parallel execution
 ################
-extract_vertex_mp
-time: 0.008975744247436523
-get_vertical_line_mp
-time: 0.03790020942687988
-generate_naive_polygon_mp
-time: 0.0747976303100586
-refine_quad_cells_mp
-time: 0.4009277820587158
+        ############ Inside generate_cells function ############
+        extract_vertex_mp
+        time: 0.0
+        get_vertical_line_mp
+        time: 0.04686307907104492
+        generate_naive_polygon_mp
+        time: 0.09372949600219727
+        refine_quad_cells_mp
+        time: 0.42177653312683105
+        ########################################################
+generate_cells_mp
+time: 0.5936136245727539
 generate_node_set_mp
-time: 0.03789782524108887
+time: 0.062489986419677734
 generate_path_mp
-time: 0.0608365535736084
-Total time without process start and end:  0.6502587795257568
-Total time:  2.0434200763702393
+time: 0.06249570846557617
+Total time without process start and end:  0.7498338222503662
+Total time:  2.202620506286621
 path generated
 
 

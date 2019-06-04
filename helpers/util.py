@@ -4,6 +4,7 @@ from helpers.sweep import *
 from helpers.graph import *
 import numpy as np
 import cv2
+import time
 import multiprocessing
 
 # Draw the obstacles and point the source and the destination----------------------------------------------
@@ -87,6 +88,51 @@ def add_boundary_cells(boundary, sorted_vertices, quad_cells, y_limit_lower, y_l
     if (boundary[1].x != sorted_vertices[len(sorted_vertices) - 1].x):
         quad_cells.append([point(sorted_vertices[len(sorted_vertices) - 1].x, y_limit_lower), boundary[1], boundary[2],
                            point(sorted_vertices[len(sorted_vertices) - 1].x, y_limit_upper)]);
+
+
+def generate_cells(limits, boundary_basic, obstacles_basic):
+    print('\t############ Inside generate_cells function ############')
+
+    [y_limit_lower, y_limit_upper, x_limit_lower, x_limit_upper]= limits
+
+    t = time.time()
+    print('\textract_vertex_se')
+    boundary, sorted_vertices, obstacles = extract_vertex(boundary_basic, obstacles_basic)
+    print("\ttime:", time.time() - t)
+
+    # generate vertical line
+    t = time.time()
+    print('\tget_vertical_line_se')
+    open_line_segments = get_vertical_line(sorted_vertices, obstacles,  y_limit_lower, y_limit_upper)
+    print("\ttime:", time.time() - t)
+
+    # Find Polygon cells naiively. Will improve next.
+    # open_line_segments and sorted_vertices has the same order of points, based on the x_value
+    t = time.time()
+    print('\tgenerate_naive_polygon_se')
+    quad_cells, left_tri_cells, right_tri_cells = generate_naive_polygon(open_line_segments, sorted_vertices, obstacles)
+    print("\ttime:", time.time() - t)
+
+    # Merge overlapping Polygons
+    t = time.time()
+    print('\trefine_quad_cells_se')
+    refine_quad_cells(quad_cells)
+    print("\ttime:", time.time() - t)
+
+    # add the boundary cells to the quad_cells
+    add_boundary_cells(boundary, sorted_vertices, quad_cells, y_limit_lower, y_limit_upper)
+
+
+    # combine all the cells
+    all_cell = quad_cells + left_tri_cells + right_tri_cells
+    # sort the cell based on teh x-value of the first point
+    ################-----   IMPORTANT  -----##################
+    all_cell.sort(key = lambda pnt: pnt[0].x)
+
+    print('\t########################################################')
+
+
+    return all_cell, boundary, sorted_vertices, obstacles
 
 
 def generate_left_tri_matrix(nodes):

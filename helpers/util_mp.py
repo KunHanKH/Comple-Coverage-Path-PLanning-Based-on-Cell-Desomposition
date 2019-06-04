@@ -99,6 +99,66 @@ def generate_baisc(approxes):
     return [y_limit_lower, y_limit_upper, x_limit_lower,x_limit_upper], boundary_basic, obstacles_basic
 
 
+
+def generate_cells_mp(limits, boundary_basic, obstacles_basic, manager, pool, unit):
+    print('\t############ Inside generate_cells function ############')
+    [y_limit_lower, y_limit_upper, x_limit_lower, x_limit_upper] = limits
+
+    obstacles_basic_manager_list = manager.list(obstacles_basic)
+
+    t = time.time()
+    print('\textract_vertex_mp')
+    # boundary, sorted_vertices, obstacles = extract_vertex(boundary_basic, obstacles_basic)
+    boundary, sorted_vertices, obstacles = extract_vertex_mp(boundary_basic, obstacles_basic_manager_list, pool)
+    sorted_vertices_manager_list = manager.list(sorted_vertices)
+    obstacles_manager_list = manager.list(obstacles)
+    print("\ttime:", time.time() - t)
+
+    # generate vertical line
+    t = time.time()
+    print('\tget_vertical_line_mp')
+    # open_line_segments = get_vertical_line(sorted_vertices, obstacles, y_limit_lower, y_limit_upper)
+    open_line_segments = get_vertical_line_mp(sorted_vertices, y_limit_lower, y_limit_upper,
+                                              obstacles_manager_list, pool)
+    # open_line_segments here has a little difference from the serial version
+    # first value is the index based on the x-value
+    # [0, [245;0, 245;647]]
+    # [1, [278;0, 278;346]]
+    # ...
+    open_line_segments_manager_list = manager.list(open_line_segments)
+    print("\ttime:", time.time() - t)
+
+    # Find Polygon cells naiively. Will improve next.
+    # open_line_segments and sorted_vertices has the same order of points, based on the x_value
+    t = time.time()
+    print('\tgenerate_naive_polygon_mp')
+    # quad_cells, left_tri_cells, right_tri_cells = generate_naive_polygon(open_line_segments, sorted_vertices, obstacles)
+    quad_cells_manager_list, left_tri_cells_manager_list, right_tri_cells_manager_list = generate_naive_polygon_mp(
+        open_line_segments_manager_list,
+        sorted_vertices_manager_list,
+        obstacles_manager_list,
+        pool, manager, unit)
+    print("\ttime:", time.time() - t)
+
+    # refine_quad_cells(quad_cells)
+    t = time.time()
+    print('\trefine_quad_cells_mp')
+    refine_quad_cells_mp(quad_cells_manager_list, pool, manager, unit)
+    print("\ttime:", time.time() - t)
+
+    # add the boundary cells to the quad_cells
+    add_boundary_cells(boundary, sorted_vertices, quad_cells_manager_list, y_limit_lower, y_limit_upper)
+
+    # get all sorted cells
+    all_cell = get_sorted_cells(quad_cells_manager_list, left_tri_cells_manager_list, right_tri_cells_manager_list)
+    all_cell_manager_list = manager.list(all_cell)
+
+    print('\t########################################################')
+
+    return all_cell_manager_list, boundary, sorted_vertices, obstacles
+
+
+
 def add_boundary_cells(boundary, sorted_vertices, quad_cells_manager_list, y_limit_lower, y_limit_upper):
     # Add boundary cell
     if boundary[0].x != sorted_vertices[0].x:
@@ -586,13 +646,14 @@ def generate_node_set_basic(index, len_node, unit, nodes, width, queue_nodes, st
                 for i, ad_node in enumerate(total_adjacent):
                     curr_node.add_middle_point(centroid([ad_node.polygon[0], ad_node.polygon[-1]]))
                     curr_node.add_path_to_adjacency(
-                        [curr_node.centroid, curr_node.middle_point[i], curr_node.adjacent[i].centroid])
+                        [curr_node.centroid, curr_node.middle_point[i], ad_node.centroid])
 
             # calculate the distance to the adjacent node
             curr_node.calculate_distance()
             curr_node.inside_path = sweep(curr_node.polygon, width, step, safeWidth)
 
             queue_nodes.append(curr_node)
+
         index += 1
         unit -= 1
 

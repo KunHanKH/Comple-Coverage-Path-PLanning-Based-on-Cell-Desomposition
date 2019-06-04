@@ -25,47 +25,19 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
     [y_limit_lower, y_limit_upper, x_limit_lower, x_limit_upper], boundary_basic, obstacles_basic = generate_baisc(
         approxes)
 
-
     t = time.time()
-    print('extract_vertex_se')
-    boundary, sorted_vertices, obstacles = extract_vertex(boundary_basic, obstacles_basic)
-    print("time:", time.time() - t)
-
-    # generate vertical line
-    t = time.time()
-    print('get_vertical_line_se')
-    open_line_segments = get_vertical_line(sorted_vertices, obstacles,  y_limit_lower, y_limit_upper)
-    print("time:", time.time() - t)
-
-    # Find Polygon cells naiively. Will improve next. 
-    # open_line_segments and sorted_vertices has the same order of points, based on the x_value
-    t = time.time()
-    print('generate_naive_polygon_se')
-    quad_cells, left_tri_cells, right_tri_cells = generate_naive_polygon(open_line_segments, sorted_vertices, obstacles)
-    print("time:", time.time() - t)
-
-    # Merge overlapping Polygons
-    t = time.time()
-    print('refine_quad_cells_se')
-    refine_quad_cells(quad_cells)
-    print("time:", time.time() - t)
-
-    # add the boundary cells to the quad_cells
-    add_boundary_cells(boundary, sorted_vertices, quad_cells, y_limit_lower, y_limit_upper)
-
-
-    # combine all the cells
-    all_cell = quad_cells + left_tri_cells + right_tri_cells
-    # sort the cell based on teh x-value of the first point
-    ################-----   IMPORTANT  -----##################
-    all_cell.sort(key = lambda pnt: pnt[0].x)
-
+    all_cell, boundary, sorted_vertices, obstacles = generate_cells([y_limit_lower, y_limit_upper, x_limit_lower, x_limit_upper], boundary_basic, obstacles_basic)
+    t_cell = time.time() - t
+    print('generate_cells_se')
+    print("time:", t_cell)
 
     # genenrate node set, inside path without step
     t = time.time()
-    print('generate_node_set_se')
+
     nodes = generate_node_set(all_cell, width, step, safeWidth)
-    print("time:", time.time() - t)
+    t_node = time.time() - t
+    print('generate_node_set_se')
+    print("time:", t_node)
 
 
     # generate left_tri_matrix using graph algorithm for generating the shortest path
@@ -78,9 +50,10 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
     
     # generate the path to travel through all node in shortest_path_node
     t = time.time()
-    print('generate_path_se')
     new_path_node = generate_path(shortest_path_node, st_path_matrix, nodes, step)
-    print("time:", time.time() - t)
+    t_path = time.time() - t
+    print('generate_path_se')
+    print("time:", t_path)
 
     # final_path, include the inside path of each polygon
     final_path = []
@@ -89,7 +62,10 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
         if(i < len(nodes)):
             final_path = final_path + nodes[node].inside_path + new_path_node[i]
 
-    print('Total time: ', time.time() - t_total)
+    t_total = time.time() - t_total
+    print('Total time: ', t_total)
+
+    print("Parallel percentage: {}%".format((t_cell + t_node + t_path)/t_total * 100))
 
     # print image
     plt.figure(figsize=(20, 10))
