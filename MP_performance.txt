@@ -48,3 +48,26 @@ generate_node_set_mp
 time: 0.03690600395202637
 generate_path_mp
 time: 0.06582427024841309
+
+#############################################
+
+MP_Add_Unit_to_func(generate_naive_polygon_mp)_and_func(refine_quad_cells_mp)
+
+The reason that other funcs doesn't involve unit:
+	extract_vertex_mp: already use Pool.map()
+	get_vertical_line_mp: need to sort based on the x-value, adding unit needs to use Queue or Manager. Unnecessary memory operation.
+	generate_node_set_mp: same as above
+	generate_path_mp: sort based on the shortest path sequence, others same as above
+
+extract_vertex_mp
+time: 0.012777566909790039
+get_vertical_line_mp
+time: 0.04588055610656738
+generate_naive_polygon_mp
+time: 0.08850908279418945
+refine_quad_cells_mp
+time: 0.43067455291748047
+generate_node_set_mp
+time: 0.0400240421295166
+generate_path_mp
+time: 0.06182122230529785

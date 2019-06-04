@@ -82,7 +82,7 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
     t = time.time()
     print('refine_quad_cells_mp')
     # refine_quad_cells(quad_cells)
-    refine_quad_cells_mp(quad_cells_manager_list, pool, manager)
+    refine_quad_cells_mp(quad_cells_manager_list, pool, manager, unit=2)
     print("time:", time.time() - t)
 
 
@@ -189,6 +189,5 @@ def generate_final_path(img_file_name, output_file_name, width, step, safeWidth)
 
 
 if __name__ == "__main__":
-    print("Parent PID", os.getpid())
     generate_final_path("new_paint.png", "output.csv", 20, None, 20)
     print("Done!!!!!")
